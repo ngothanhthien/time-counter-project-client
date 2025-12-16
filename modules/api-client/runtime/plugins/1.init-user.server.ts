@@ -10,10 +10,17 @@ export default defineNuxtPlugin({
     const { token, setToken } = useAuthToken()
     const accessToken = useCookie('access_token')
 
+    const requestHeaders = useRequestHeaders(['x-forwarded-for'])
+
+    const ipHeaders = requestHeaders['x-forwarded-for']
+      ? { 'X-Forwarded-For': requestHeaders['x-forwarded-for'] }
+      : {}
+
     if (token.value) {
       try {
         await $fetch(`${baseURL}/api/me`, {
           headers: {
+            ...ipHeaders,
             Authorization: `Bearer ${token.value}`
           }
         })
@@ -29,6 +36,9 @@ export default defineNuxtPlugin({
           method: 'POST',
           body: {
             access_token: accessToken.value
+          },
+          headers: {
+            ...ipHeaders
           }
         }) as string
 
@@ -42,7 +52,10 @@ export default defineNuxtPlugin({
     if (!token.value) {
         try {
           const response = await $fetch(`${baseURL}/api/register`, {
-            method: 'POST'
+            method: 'POST',
+            headers: {
+              ...ipHeaders
+            }
           }) as any
 
           setToken(response.token)
