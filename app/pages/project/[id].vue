@@ -223,18 +223,20 @@
             <!-- Add Timer Button -->
             <button
               class="text-xs text-gray-400 hover:text-gray-600 transition-colors flex items-center gap-1.5 py-1.5 px-1"
+              :disabled="isAddingTimer || !project"
               @click="addNewTimer"
             >
               <Plus :size="12" />
               <span>Add timer</span>
             </button>
+            <p v-if="timerError" class="text-sm text-red-600">{{ timerError }}</p>
 
             <!-- Timers List -->
-            <div v-for="timerId in timerIds" :key="timerId" class="space-y-4">
+            <div v-for="entry in timeEntries" :key="entry.id" class="space-y-4">
               <Timer
                 :project-id="projectId"
                 :project="project"
-                :time-entries="timeEntries"
+                :time-entries="[entry]"
                 @create-time-entry="createTimeEntry"
                 @start-time-entry="startTimeEntry"
                 @stop-time-entry="stopTimeEntry"
@@ -281,9 +283,9 @@ const isSavingName = ref(false)
 const isDeleting = ref(false)
 const isAddingNote = ref(false)
 const noteError = ref<string | null>(null)
+const isAddingTimer = ref(false)
+const timerError = ref<string | null>(null)
 const activeNoteAction = ref<number | null>(null)
-const timerIds = ref<number[]>([Date.now()]) // Start with one timer
-let timerIdCounter = Date.now()
 
 // onClickOutside refs for note editing
 const editContainerRefs = ref<Map<number, HTMLElement>>(new Map())
@@ -665,7 +667,7 @@ const createTimeEntry = async () => {
 
   try {
     const newEntry = await nuxtApp.runWithContext(() => projectsRepository.createProjectTimeEntry(project.value!.id))
-    timeEntries.value.push(newEntry)
+    timeEntries.value.unshift(newEntry)
     return newEntry
   }
   catch (error: unknown) {
@@ -731,9 +733,22 @@ const updateTimeEntry = async (timeEntryId: number, totalSeconds: number) => {
   }
 }
 
-const addNewTimer = () => {
-  timerIdCounter++
-  timerIds.value.unshift(timerIdCounter) // Add new timer at the beginning
+const addNewTimer = async () => {
+  if (!project.value || isAddingTimer.value) return
+
+  isAddingTimer.value = true
+  timerError.value = null
+  try {
+    await createTimeEntry()
+  }
+  catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to create timer'
+    timerError.value = message
+    console.error(message, error)
+  }
+  finally {
+    isAddingTimer.value = false
+  }
 }
 
 const handleSnapshotCreated = async () => {
