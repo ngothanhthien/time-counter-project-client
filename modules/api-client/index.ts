@@ -45,10 +45,9 @@ export default defineNuxtModule<ModuleOptions>({
     } as any
 
     // Register plugins - must point to the actual files, not directory
-    // API plugin must be loaded first (no order specified means it runs normally)
-    addPlugin(resolve('./runtime/plugins/api'))
+    addPlugin(resolve('./runtime/plugins/1.init-user.server'))
+    addPlugin(resolve('./runtime/plugins/2.api'))
 
-    addPlugin(resolve('./runtime/plugins/auth-middleware'))
 
     // Register composables directory for auto-import
     addImportsDir(resolve('./runtime/composables'))

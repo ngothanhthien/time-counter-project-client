@@ -1,3 +1,4 @@
+import { useAuthToken } from '../composables/useAuthToken'
 import type { ApiError } from '../types/api-client'
 
 export default defineNuxtPlugin({
@@ -6,26 +7,18 @@ export default defineNuxtPlugin({
     const config = useRuntimeConfig()
     const apiConfig = config.public.apiClient as any
     const baseURL = apiConfig?.baseURL || ''
-    const tokenKey = apiConfig?.tokenKey || 'token'
-    const loginPath = apiConfig?.loginPath || '/login'
     const retry = apiConfig?.retry || 1
     const retryDelay = apiConfig?.retryDelay || 500
     const timeout = apiConfig?.timeout || 10000
+    const { token } = useAuthToken()
 
     const api = $fetch.create({
       baseURL,
       onRequest({ request, options }) {
-        const tokenCookie = useCookie(tokenKey, {
-          default: () => '',
-          secure: true,
-          sameSite: 'strict',
-          httpOnly: false, // Allow client-side access
-        })
-
-        const token = tokenCookie.value
-        if (token) {
+        const tokenValue = token.value
+        if (tokenValue) {
           options.headers = options.headers || {}
-          setHeaders(options.headers, 'Authorization', `Bearer ${token}`)
+          setHeaders(options.headers, 'Authorization', `Bearer ${tokenValue}`)
         }
         if (!(options.body instanceof FormData)) {
           options.headers = options.headers || {}
@@ -33,6 +26,15 @@ export default defineNuxtPlugin({
         }
         options.headers = options.headers || {}
         setHeaders(options.headers, 'Accept', 'application/json')
+
+        if (import.meta.server) {
+            const headers = useRequestHeaders(['x-forwarded-for'])
+            const clientIp = headers['x-forwarded-for']
+
+            if (clientIp) {
+                setHeaders(options.headers, 'X-Forwarded-For', clientIp)
+            }
+        }
 
         if (import.meta.dev || true) {
           console.log(`🚀 API Request: ${options.method || 'GET'} ${request}`)
@@ -52,24 +54,6 @@ export default defineNuxtPlugin({
         }
 
         switch (response.status) {
-          case 401: {
-            // Unauthorized - clear token and redirect to login
-            const tokenCookie = useCookie('token', {
-              default: () => '',
-              secure: true,
-              sameSite: 'strict',
-              httpOnly: false,
-            })
-            tokenCookie.value = ''
-
-            // Only handle navigation on client side
-            if (import.meta.client) {
-              navigateTo(loginPath)
-            }
-            errorData.message = 'Authentication required'
-            break
-          }
-
           case 403:
             errorData.message = 'Access forbidden'
             break
